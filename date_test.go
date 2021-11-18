@@ -11,6 +11,25 @@ import (
 	"github.com/gorilla/schema"
 )
 
+func TestDate_UTC(t *testing.T) {
+	d := date.Today()
+	tm := d.UTC()
+	if tm.Location().String() != time.UTC.String() {
+		t.Error("case #1 failed: Location not equal")
+		return
+	}
+
+	if d.Day() != tm.Day() || d.Month() != tm.Month() || d.Year() != tm.Year() {
+		t.Error("case #2 failed:  day, month, year not equal")
+		return
+	}
+
+	if tm.Hour() != 0 || tm.Minute() != 0 || tm.Second() != 0 || tm.Nanosecond() != 0 {
+		t.Error("case #3 failed:  hour, min, sec or nanosec not equal to zero")
+	}
+
+}
+
 func TestDate_Today(t *testing.T) {
 	d := date.Today()
 	t.Log(d)
@@ -261,4 +280,3 @@ func TestSchema(t *testing.T) {
 
 	t.Logf("%x:%x", f.FromDt, f.ToDt)
 }
-~ ` `

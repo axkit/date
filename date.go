@@ -62,6 +62,11 @@ func (d Date) Time() time.Time {
 	return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.Local)
 }
 
+// UTC convert Date to Time in UTC zone.
+func (d Date) UTC() time.Time {
+	return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC)
+}
+
 func (d Date) byteArr(res *[10]byte) {
 
 	*res = tmpl
