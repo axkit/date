@@ -62,9 +62,14 @@ func (d Date) Time() time.Time {
 	return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.Local)
 }
 
-// UTC convert Date to Time in UTC zone.
+// UTC convert Date to time.Time in UTC zone.
 func (d Date) UTC() time.Time {
 	return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+// In convers Date to time.Time in specified location.
+func (d Date) In(loc *time.Location) time.Time {
+	return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, loc)
 }
 
 func (d Date) byteArr(res *[10]byte) {
