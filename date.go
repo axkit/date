@@ -124,9 +124,9 @@ func (d Date) byteSlice(res []byte) {
 
 // String implements interface Stringer. Returns empty string if date is empty.
 // If not, returns date as a string YYYY-MM-DD.
-func (d *Date) String() string {
+func (d Date) String() string {
 
-	if s, ok := pfm[*d]; ok {
+	if s, ok := pfm[d]; ok {
 		return s
 	}
 
