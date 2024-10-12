@@ -146,6 +146,3 @@ go test github.com/axkit/date
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-```
-
-This README provides an overview of the package's features, how to install it, and how to use its primary functions.
