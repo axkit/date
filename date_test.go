@@ -1,282 +1,198 @@
 package date_test
 
 import (
-	"encoding/json"
+	"database/sql/driver"
+	"reflect"
 	"testing"
 	"time"
 
-	"net/url"
-
 	"github.com/axkit/date"
-	"github.com/gorilla/schema"
 )
 
-func TestDate_UTC(t *testing.T) {
-	d := date.Today()
-	tm := d.UTC()
-	if tm.Location().String() != time.UTC.String() {
-		t.Error("case #1 failed: Location not equal")
-		return
-	}
-
-	if d.Day() != tm.Day() || d.Month() != tm.Month() || d.Year() != tm.Year() {
-		t.Error("case #2 failed:  day, month, year not equal")
-		return
-	}
-
-	if tm.Hour() != 0 || tm.Minute() != 0 || tm.Second() != 0 || tm.Nanosecond() != 0 {
-		t.Error("case #3 failed:  hour, min, sec or nanosec not equal to zero")
-	}
-
-}
-
-func TestDate_Today(t *testing.T) {
-	d := date.Today()
-	t.Log(d)
-}
-
-func TestNewYMD(t *testing.T) {
-	d := date.New(2018, 1, 31)
-	if d.String() != "2018-01-31" {
-		t.Error("NewYMD failed ", d.String())
-	}
-}
-
-func TestAddDate(t *testing.T) {
-	d := date.New(2018, 1, 31)
-	d = d.Add(0, 0, 1)
-
-	if d != date.New(2018, 2, 1) {
-		t.Error("AddDate() failed", d.String())
-	}
-}
-
-func TestDay(t *testing.T) {
-	d := date.New(2018, 1, 31)
-	if d.Day() != 31 {
-		t.Error("Day() failed. Expected 31, got: ", d.Day())
-	}
-}
-
-func TestMonth(t *testing.T) {
-	d := date.New(2018, 1, 31)
-	if d.Month() != 1 {
-		t.Error("Day() failed. Expected 1, got: ", d.Day())
-	}
-}
-
-func TestYear(t *testing.T) {
-	d := date.New(2018, 1, 31)
-	if d.Year() != 2018 {
-		t.Error("Year() failed. Expected 2018, got: ", d.Year())
-	}
-}
-
-func TestString(t *testing.T) {
-	d := date.Date(uint32(0x20180131))
-
-	if s := d.String(); s != "2018-01-31" {
-		t.Error("String() failed", s)
-	}
-}
-
-func TestParse(t *testing.T) {
-
-	m := map[string]struct {
-		d  date.Date
-		ok bool
+func TestNew(t *testing.T) {
+	tests := []struct {
+		year   int
+		month  time.Month
+		day    int
+		expect date.Date
 	}{
-		"2017-06-02": {date.New(2017, time.Month(6), 2), true},
-		"2017-02-28": {date.New(2017, time.Month(2), 28), true},
-		"2017-22-28": {date.New(2017, time.Month(22), 28), false},
+		{2023, time.January, 1, date.New(2023, time.January, 1)},
+		{0, 0, 0, date.Null()},
 	}
 
-	for k, v := range m {
-		d, err := date.Parse(k)
-		if err != nil && v.ok == false {
-			continue
-		}
-
-		if err == nil && v.ok == false {
-			t.Errorf("Test case %s failed!", k)
-			continue
-		}
-
-		if v.d != d {
-			t.Errorf(k, v)
+	for _, tt := range tests {
+		if result := date.New(tt.year, tt.month, tt.day); result != tt.expect {
+			t.Errorf("New(%d, %d, %d) = %v; want %v", tt.year, tt.month, tt.day, result, tt.expect)
 		}
 	}
 }
 
-func TestDateMarshal(t *testing.T) {
+func TestToday(t *testing.T) {
+	today := date.Today()
+	now := time.Now()
+	expected := date.New(now.Year(), now.Month(), now.Day())
 
-	d := date.New(2019, 3, 1)
-	buf, err := json.Marshal(d)
-
-	if err != nil {
-		t.Error(err)
-	} else {
-		t.Log(string(buf))
-	}
-
-	if string(buf) != `"2019-03-01"` {
-		t.Error("marshal failed. got:", string(buf))
-	}
-
-}
-
-func TestDateUnmarshal(t *testing.T) {
-
-	var d struct {
-		D date.Date `json:"d"`
-		N date.Date `json:"n"`
-		E date.Date `json:"e"`
-	}
-
-	d.N = date.Today()
-
-	j := []byte(`{"d" : "2018-01-31", "n": null}`)
-
-	err := json.Unmarshal(j, &d)
-
-	if err != nil {
-		t.Error(err)
-	}
-
-	if d.N.Valid() {
-		t.Fatal("ашибка")
-	}
-
-	t.Log(d.D.String())
-}
-
-func BenchmarkDateStringPreCached(b *testing.B) {
-
-	date.InitPreformattedValues(date.FiveYearBefore, date.FiveYearAfter)
-	b.ResetTimer()
-
-	d := date.Today()
-	for n := 0; n < b.N; n++ {
-		s := d.String()
-		_ = s
+	if today != expected {
+		t.Errorf("Today() = %v; want %v", today, expected)
 	}
 }
 
-func BenchmarkDateString(b *testing.B) {
-
-	date.InitPreformattedValues(date.FiveYearBefore, date.FiveYearAfter)
-	b.ResetTimer()
-
-	d := date.Today().Add(10, 0, 0)
-	for n := 0; n < b.N; n++ {
-		s := d.String()
-		_ = s
-	}
-}
-
-func BenchmarkTimeString(b *testing.B) {
-	t := time.Now()
-	for n := 0; n < b.N; n++ {
-		_ = t.String()
-	}
-}
-
-func BenchmarkDateMarshalPreCached(b *testing.B) {
-
-	date.InitPreformattedValues(date.FiveYearBefore, date.FiveYearAfter)
-	b.ResetTimer()
-
-	d := date.Today()
-	for n := 0; n < b.N; n++ {
-		_, _ = json.Marshal(&d)
-	}
-}
-
-func BenchmarkDateMarshal(b *testing.B) {
-
-	date.InitPreformattedValues(date.FiveYearBefore, date.FiveYearAfter)
-	b.ResetTimer()
-
-	d := date.Today().Add(10, 0, 0)
-	for n := 0; n < b.N; n++ {
-		_, _ = json.Marshal(&d)
-	}
-}
-
-func BenchmarkTimeMarshal(b *testing.B) {
-
-	date.InitPreformattedValues(date.FiveYearBefore, date.FiveYearAfter)
-	b.ResetTimer()
-
-	d := time.Now()
-	for n := 0; n < b.N; n++ {
-		_, _ = json.Marshal(d)
+func TestDate_String(t *testing.T) {
+	tests := []struct {
+		date   date.Date
+		expect string
+	}{
+		{date.New(2023, time.January, 1), "2023-01-01"},
+		{date.Null(), ""},
 	}
 
-}
-
-func BenchmarkDatePreCachedUnmarshal(b *testing.B) {
-
-	b.ResetTimer()
-
-	var d date.Date
-	buf := []byte(`"2018-01-31"`)
-	for n := 0; n < b.N; n++ {
-		if err := json.Unmarshal(buf, &d); err != nil {
-			b.Error(err)
+	for _, tt := range tests {
+		if result := tt.date.String(); result != tt.expect {
+			t.Errorf("Date.String() = %v; want %v", result, tt.expect)
 		}
 	}
 }
 
-func BenchmarkDateUnmarshal(b *testing.B) {
+func TestDate_Add(t *testing.T) {
+	tests := []struct {
+		date   date.Date
+		years  int
+		months int
+		days   int
+		expect date.Date
+	}{
+		{date.New(2023, time.January, 1), 1, 0, 0, date.New(2024, time.January, 1)},
+		{date.New(2023, time.January, 1), 0, 1, 0, date.New(2023, time.February, 1)},
+		{date.New(2023, time.January, 1), 0, 0, 1, date.New(2023, time.January, 2)},
+	}
 
-	b.ResetTimer()
-
-	var d date.Date
-	buf := []byte(`"2011-01-31"`)
-	for n := 0; n < b.N; n++ {
-		if err := json.Unmarshal(buf, &d); err != nil {
-			b.Error(err)
+	for _, tt := range tests {
+		if result := tt.date.Add(tt.years, tt.months, tt.days); result != tt.expect {
+			t.Errorf("Date.Add(%d, %d, %d) = %v; want %v", tt.years, tt.months, tt.days, result, tt.expect)
 		}
 	}
 }
 
-func BenchmarkTimeUnmarshal(b *testing.B) {
+func TestDate_Parse(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect date.Date
+		err    bool
+	}{
+		{"2023-01-01", date.New(2023, time.January, 1), false},
+		{"0000-00-00", date.Null(), true},
+	}
 
-	b.ResetTimer()
-
-	var t time.Time
-	buf := []byte(`"2018-01-31T01:02:03Z"`)
-	for n := 0; n < b.N; n++ {
-		if err := json.Unmarshal(buf, &t); err != nil {
-			b.Error(err)
+	for _, tt := range tests {
+		var d date.Date
+		err := d.Parse(tt.input)
+		if tt.err {
+			if err == nil {
+				t.Errorf("Date.Parse(%q) expected error; got nil", tt.input)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Date.Parse(%q) unexpected error: %v", tt.input, err)
+			}
+			if d != tt.expect {
+				t.Errorf("Date.Parse(%q) = %v; want %v", tt.input, d, tt.expect)
+			}
 		}
 	}
 }
 
-func TestSchema(t *testing.T) {
-
-	type filter struct {
-		FromDt date.Date `schema:"from_dt"`
-		ToDt   date.Date `schema:"to_dt"`
+func TestDate_Year(t *testing.T) {
+	date := date.New(2023, time.January, 1)
+	if year := date.Year(); year != 2023 {
+		t.Errorf("Date.Year() = %d; want %d", year, 2023)
 	}
-	var f filter
+}
 
-	var data url.Values = map[string][]string{
-		"from_dt": {"2019-03-01"},
-		"to_dt":   {"2019-03-11"},
-		"page":    {"0"},
-		"rows":    {"10"},
+func TestDate_Month(t *testing.T) {
+	date := date.New(2023, time.January, 1)
+	if month := date.Month(); month != time.January {
+		t.Errorf("Date.Month() = %v; want %v", month, time.January)
+	}
+}
+
+func TestDate_Day(t *testing.T) {
+	date := date.New(2023, time.January, 1)
+	if day := date.Day(); day != 1 {
+		t.Errorf("Date.Day() = %d; want %d", day, 1)
+	}
+}
+
+func TestDate_Value(t *testing.T) {
+	tests := []struct {
+		date   date.Date
+		expect driver.Value
+	}{
+		{date.New(2023, time.January, 1), []byte("2023-01-01")},
+		{date.Null(), nil},
 	}
 
-	decoder := schema.NewDecoder()
-	//decoder.RegisterConverter(filter.FromDt, converter)
-	//decoder := schema.NewDecoder()
-	decoder.RegisterConverter(f.FromDt, date.Converter)
-	decoder.IgnoreUnknownKeys(true)
-	if err := decoder.Decode(&f, data); err != nil {
-		t.Error(err)
+	for _, tt := range tests {
+		value, _ := tt.date.Value()
+
+		if !reflect.DeepEqual(value, tt.expect) {
+			t.Errorf("Date.Value() = %v; want %v", value, tt.expect)
+		}
+	}
+}
+
+func TestDate_Valid(t *testing.T) {
+	tests := []struct {
+		date   date.Date
+		expect bool
+	}{
+		{date.New(2023, time.January, 1), true},
+		{date.Null(), false},
 	}
 
-	t.Logf("%x:%x", f.FromDt, f.ToDt)
+	for _, tt := range tests {
+		if valid := tt.date.Valid(); valid != tt.expect {
+			t.Errorf("Date.Valid() = %v; want %v", valid, tt.expect)
+		}
+	}
+}
+
+func TestDate_Scan(t *testing.T) {
+	tests := []struct {
+		input  interface{}
+		expect date.Date
+		err    bool
+	}{
+		{time.Date(2023, time.January, 1, 0, 0, 0, 0, time.Local), date.New(2023, time.January, 1), false},
+		{nil, date.Null(), false},
+		{"Invalid", date.Null(), true},
+	}
+
+	for _, tt := range tests {
+		var d date.Date
+		err := d.Scan(tt.input)
+		if tt.err {
+			if err == nil {
+				t.Errorf("Date.Scan(%v) expected error; got nil", tt.input)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Date.Scan(%v) unexpected error: %v", tt.input, err)
+			}
+			if d != tt.expect {
+				t.Errorf("Date.Scan(%v) = %v; want %v", tt.input, d, tt.expect)
+			}
+		}
+	}
+}
+
+func TestInitPreformattedValues(t *testing.T) {
+	from := date.New(2023, time.January, 1)
+	to := date.New(2023, time.January, 5)
+	date.InitPreformattedValues(from, to)
+	if from.String() != "2023-01-01" {
+		t.Errorf("Date.String() = %v; want %v", from.String(), "2023-01-01")
+	}
+	if to.String() != "2023-01-05" {
+		t.Errorf("Date.String() = %v; want %v", to.String(), "2023-01-05")
+	}
 }
