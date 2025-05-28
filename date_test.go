@@ -196,3 +196,58 @@ func TestInitPreformattedValues(t *testing.T) {
 		t.Errorf("Date.String() = %v; want %v", to.String(), "2023-01-05")
 	}
 }
+func TestDate_MarshalJSON(t *testing.T) {
+	tests := []struct {
+		date   date.Date
+		expect []byte
+		err    bool
+	}{
+		{date.New(2023, time.January, 1), []byte("2023-01-01"), false},
+		{date.Null(), []byte("null"), false},
+	}
+
+	for _, tt := range tests {
+		result, err := tt.date.MarshalJSON()
+		if tt.err {
+			if err == nil {
+				t.Errorf("Date.MarshalJSON() expected error; got nil")
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Date.MarshalJSON() unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(result, tt.expect) {
+				t.Errorf("Date.MarshalJSON() = %v; want %v", string(result), string(tt.expect))
+			}
+		}
+	}
+}
+func TestDate_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		input  []byte
+		expect date.Date
+		err    bool
+	}{
+		{[]byte("2023-01-01"), date.New(2023, time.January, 1), false},
+		{[]byte("null"), date.Null(), false},
+		{[]byte("invalid"), date.Null(), true},
+		{[]byte(`""`), date.Null(), false},
+	}
+
+	for _, tt := range tests {
+		var d date.Date
+		err := d.UnmarshalJSON(tt.input)
+		if tt.err {
+			if err == nil {
+				t.Errorf("Date.UnmarshalJSON(%v) expected error; got nil", string(tt.input))
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Date.UnmarshalJSON(%v) unexpected error: %v", string(tt.input), err)
+			}
+			if d != tt.expect {
+				t.Errorf("Date.UnmarshalJSON(%v) = %v; want %v", string(tt.input), d, tt.expect)
+			}
+		}
+	}
+}

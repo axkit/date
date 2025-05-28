@@ -222,3 +222,34 @@ func parseYYYYMMDD(b []byte) (Date, error) {
 	}
 	return newDate(y, time.Month(m), d), nil
 }
+
+func (d Date) MarshalJSON() ([]byte, error) {
+	if !d.Valid() {
+		return null, nil
+	}
+
+	if s, ok := pfm[d]; ok {
+		return []byte(s), nil
+	}
+
+	var buf [10]byte
+	d.byteArr(&buf)
+
+	return buf[:], nil
+}
+
+func (d *Date) UnmarshalJSON(b []byte) error {
+	if len(b) == 0 ||
+		(len(b) == 4 && b[0] == 'n' && b[1] == 'u' && b[2] == 'l' && b[3] == 'l') ||
+		(len(b) == 2 && b[0] == '"' && b[1] == '"') {
+		*d = 0
+		return nil
+	}
+
+	pd, err := parseYYYYMMDD(b)
+	if err != nil {
+		return err
+	}
+	*d = pd
+	return nil
+}
