@@ -2,6 +2,7 @@ package date_test
 
 import (
 	"database/sql/driver"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -48,6 +49,7 @@ func TestDate_String(t *testing.T) {
 
 	for _, tt := range tests {
 		if result := tt.date.String(); result != tt.expect {
+			fmt.Println("result:", result)
 			t.Errorf("Date.String() = %v; want %v", result, tt.expect)
 		}
 	}
@@ -202,7 +204,7 @@ func TestDate_MarshalJSON(t *testing.T) {
 		expect []byte
 		err    bool
 	}{
-		{date.New(2023, time.January, 1), []byte("2023-01-01"), false},
+		{date.New(2023, time.January, 1), []byte(`"2023-01-01"`), false},
 		{date.Null(), []byte("null"), false},
 	}
 
@@ -228,7 +230,7 @@ func TestDate_UnmarshalJSON(t *testing.T) {
 		expect date.Date
 		err    bool
 	}{
-		{[]byte("2023-01-01"), date.New(2023, time.January, 1), false},
+		{[]byte(`"2023-01-01"`), date.New(2023, time.January, 1), false},
 		{[]byte("null"), date.Null(), false},
 		{[]byte("invalid"), date.Null(), true},
 		{[]byte(`""`), date.Null(), false},
@@ -249,5 +251,94 @@ func TestDate_UnmarshalJSON(t *testing.T) {
 				t.Errorf("Date.UnmarshalJSON(%v) = %v; want %v", string(tt.input), d, tt.expect)
 			}
 		}
+	}
+}
+
+// Generate benchmarks for date.Date methods
+func BenchmarkDate_New(b *testing.B) {
+	for b.Loop() {
+		_ = date.New(2023, time.January, 1)
+	}
+}
+
+func BenchmarkDate_Today(b *testing.B) {
+	for b.Loop() {
+		_ = date.Today()
+	}
+}
+
+func TestMain(m *testing.M) {
+	date.InitPreformattedValues(date.New(2022, time.January, 1), date.New(2024, time.January, 5))
+	m.Run()
+}
+
+func BenchmarkDate_String(b *testing.B) {
+	d := date.New(2023, time.January, 1)
+	for b.Loop() {
+		_ = d.String()
+	}
+}
+
+func BenchmarkDate_Parse(b *testing.B) {
+	for b.Loop() {
+		var d date.Date
+		_ = d.Parse("2023-01-01")
+	}
+}
+
+func BenchmarkDate_Year(b *testing.B) {
+	d := date.New(2023, time.January, 1)
+	for b.Loop() {
+		_ = d.Year()
+	}
+}
+
+func BenchmarkDate_Month(b *testing.B) {
+	d := date.New(2023, time.January, 1)
+	for b.Loop() {
+		_ = d.Month()
+	}
+}
+
+func BenchmarkDate_Day(b *testing.B) {
+	d := date.New(2023, time.January, 1)
+	for b.Loop() {
+		_ = d.Day()
+	}
+}
+
+func BenchmarkDate_Value(b *testing.B) {
+	d := date.New(2023, time.January, 1)
+	for b.Loop() {
+		_, _ = d.Value()
+	}
+}
+
+func BenchmarkDate_Valid(b *testing.B) {
+	d := date.New(2023, time.January, 1)
+	for b.Loop() {
+		_ = d.Valid()
+	}
+}
+
+func BenchmarkDate_Scan(b *testing.B) {
+	for b.Loop() {
+		var d date.Date
+		_ = d.Scan(time.Date(2023, time.January, 1, 0, 0, 0, 0, time.Local))
+	}
+}
+
+func BenchmarkDate_MarshalJSON(b *testing.B) {
+	d := date.New(2023, time.January, 1)
+	for b.Loop() {
+		_, _ = d.MarshalJSON()
+	}
+}
+
+func BenchmarkDate_UnmarshalJSON(b *testing.B) {
+	input := []byte(`"2023-01-01"`)
+	for b.Loop() {
+		var d date.Date
+		_ = d.UnmarshalJSON(input)
 	}
 }

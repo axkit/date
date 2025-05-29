@@ -17,17 +17,15 @@ type Date uint32
 
 // Predefined variables
 var (
-	Separator         byte = '-'
-	DatabaseSeparator byte = '-'
-	tmpl                   = [10]byte{'0', '0', '0', '0', Separator, '0', '0', Separator, '0', '0'}
-	tmplDB                 = [10]byte{'0', '0', '0', '0', DatabaseSeparator, '0', '0', DatabaseSeparator, '0', '0'}
-	tmplJS                 = [12]byte{'"', '0', '0', '0', '0', Separator, '0', '0', Separator, '0', '0', '"'}
+	Separator byte = '-'
+	tmpl           = [10]byte{'0', '0', '0', '0', Separator, '0', '0', Separator, '0', '0'}
+	tmplJS         = [12]byte{'"', '0', '0', '0', '0', Separator, '0', '0', Separator, '0', '0', '"'}
 
-	pfm map[Date]string
-	pjm map[string]Date
+	pfm  map[Date]string
+	pjm  map[string]Date
+	pjsm map[Date][12]byte
 
-	null  = []byte("null")
-	cache string
+	null = []byte("null")
 
 	// FiveYearBefore represents the date five years before today.
 	FiveYearBefore = Today().Add(-5, 0, 0)
@@ -39,13 +37,20 @@ var (
 // This function populates two maps, pfm and pjm, for date-to-string and string-to-date
 // conversions, respectively, to optimize date marshaling and unmarshaling.
 func InitPreformattedValues(from, to Date) {
-	pfm = make(map[Date]string, (to.Time().Sub(from.Time()))/(24*time.Hour)+1)
-	pjm = make(map[string]Date, (to.Time().Sub(from.Time()))/(24*time.Hour)+1)
+	days := (to.Time().Sub(from.Time())) / (24 * time.Hour)
+	if days < 0 {
+		return
+	}
+
+	pfm = make(map[Date]string, days)
+	pjm = make(map[string]Date, days)
+	pjsm = make(map[Date][12]byte, days)
 	d := from
 	for d < to {
 		d = d.Add(0, 0, 1)
 		pfm[d] = d.String()
 		pjm[d.String()] = d
+		pjsm[d] = d.byteArrQuoted()
 	}
 }
 
@@ -67,25 +72,29 @@ func (d Date) In(loc *time.Location) time.Time {
 // String returns the date as a string formatted as "YYYY-MM-DD".
 // If the date is null, an empty string is returned.
 func (d Date) String() string {
-	if s, ok := pfm[d]; ok {
-		return s
+
+	if len(pfm) > 0 {
+		if s, ok := pfm[d]; ok {
+			return s
+		}
 	}
+
 	if !d.Valid() {
 		return ""
 	}
+
 	return d.string()
 }
 
 // string is a private helper that returns the Date as a formatted string "YYYY-MM-DD".
 func (d Date) string() string {
-	var buf [10]byte
-	d.byteArr(&buf)
+	buf := d.byteArr()
 	return string(buf[:])
 }
 
-func (d Date) byteArr(res *[10]byte) {
+func (d Date) byteArr() [10]byte {
 
-	*res = tmpl
+	res := tmpl
 	i := uint32(d)
 	zero := byte('0')
 
@@ -99,6 +108,26 @@ func (d Date) byteArr(res *[10]byte) {
 
 	res[8] = byte((i>>4)&0x0000000F) + zero
 	res[9] = byte(i&0x0000000F) + zero
+	return res
+}
+
+func (d Date) byteArrQuoted() [12]byte {
+
+	res := tmplJS
+	i := uint32(d)
+	zero := byte('0')
+
+	res[1] = byte((i>>28)&0x0000000F) + zero
+	res[2] = byte((i>>24)&0x0000000F) + zero
+	res[3] = byte((i>>20)&0x0000000F) + zero
+	res[4] = byte((i>>16)&0x0000000F) + zero
+
+	res[6] = byte((i>>12)&0x0000000F) + zero
+	res[7] = byte((i>>8)&0x0000000F) + zero
+
+	res[9] = byte((i>>4)&0x0000000F) + zero
+	res[10] = byte(i&0x0000000F) + zero
+	return res
 }
 
 // Add returns a new Date that is the result of adding the specified number
@@ -160,7 +189,8 @@ func (d Date) Value() (driver.Value, error) {
 	if !d.Valid() {
 		return nil, nil
 	}
-	return []byte(d.String()), nil
+	x := d.byteArr()
+	return x[:], nil
 }
 
 // Valid returns false if the Date is null.
@@ -210,9 +240,13 @@ func dec2hexy(i uint32) uint32 {
 
 // parseYYYYMMDD decodes a byte array in the format "YYYY-MM-DD" to a Date.
 func parseYYYYMMDD(b []byte) (Date, error) {
-	if len(b) < 10 {
-		return Null(), errors.New("input date length less than 10 bytes")
+	switch {
+	case len(b) != 10 && len(b) != 12:
+		return Null(), errors.New("invalid date format, expected 10 or 12 bytes")
+	case len(b) == 12 && (b[0] == '"' && b[11] == '"'):
+		b = b[1:11] // remove quotes
 	}
+
 	y := int(b[0]-'0')*1000 + int(b[1]-'0')*100 + int(b[2]-'0')*10 + int(b[3]-'0')
 	m := int(b[5]-'0')*10 + int(b[6]-'0')
 	d := int(b[8]-'0')*10 + int(b[9]-'0')
@@ -228,12 +262,11 @@ func (d Date) MarshalJSON() ([]byte, error) {
 		return null, nil
 	}
 
-	if s, ok := pfm[d]; ok {
-		return []byte(s), nil
+	if jsonDate, ok := pjsm[d]; ok {
+		return jsonDate[:], nil
 	}
 
-	var buf [10]byte
-	d.byteArr(&buf)
+	buf := d.byteArrQuoted()
 
 	return buf[:], nil
 }
